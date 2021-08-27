@@ -1,11 +1,19 @@
 /*
- An example showing 'ring' analogue meter on a HX8357 TFT
- colour screen
+  An example showing 'ring' analogue meter on a HX8357 TFT
+  colour screen
+  Needs Fonts 2, 4 and 7 (also Font 6 if using a large size meter)
+*/
 
- Needs Fonts 2, 4 and 7 (also Font 6 if using a large size meter)
- */
+// #########################################################################
+// Pin Naming
+// #########################################################################
+#define CSENSE A2
+#define HALL 18
+#define VSENSE A3
 
+// #########################################################################
 // Meter colour schemes
+// #########################################################################
 #define RED2RED 0
 #define GREEN2GREEN 1
 #define BLUE2BLUE 2
@@ -13,45 +21,50 @@
 #define GREEN2RED 4
 #define RED2GREEN 5
 
-// #include <avr/dtostrf.h> // Only needed for Due
-
+// #########################################################################
+// LCD Initialisation
+// #########################################################################
 #include <TFT_HX8357.h> // Hardware-specific library
-
 TFT_HX8357 tft = TFT_HX8357();       // Invoke custom library
-
 #define HX8357_GREY 0x2104 // Dark grey 16 bit colour
-
-uint32_t runTime = -99999;       // time for next update
-
+uint32_t runTime = -999;       // time for next update
 int reading = 0; // Value to be displayed
 int d = 0; // Variable used for the sinewave test waveform
 boolean alert = 0;
 int8_t ramp = 1;
-
-#define CHANGE 1
-#define FALLING 2
-#define RISING 3
-
-unsigned long start, finished;
+int xpos = 0, ypos = 0, gap = 0, radius = 0; //Variables for ring meter
+int cyclecount = 0;
+byte frames;
+int fps;
+int lastfps;
+// #########################################################################
+// Hardware Interrupt Initialisation
+// #########################################################################
+#define FALLING 2 //define falling edge state as "FALLING"
+unsigned long start, finished, now; // Variables for time
 const int debounce = 10;  // debounce in milliseconds
-unsigned long now = 0;
-
-byte Rotations = 0;
-byte Speed = 0;
+byte Rotations = 0; //Variable for # of rotations
+byte Speed = 0; // Variable to hold speed
+float Voltage ; //Variable to hold voltage
+float LastVoltage = 0 ;
+float Vk = .98;
+// #########################################################################
+// Setup
+// #########################################################################
 
 void setup(void) {
+  //setup LCD
   tft.begin();
   //Serial.begin(9600);
   tft.setRotation(1);
-
   tft.fillScreen(HX8357_BLACK);
 
-  
-  pinMode(18, INPUT_PULLUP);
+  //setup hardware interrupt
+  pinMode(HALL, INPUT_PULLUP); //set the speedometer switch pin (D18) as an input with an internal pull up to 5V.
   attachInterrupt(digitalPinToInterrupt(18), speedCalc, RISING); // interrupt called when falling edge is detected on digital pin 18
-  start = millis();
-  delay(3000);
-  Serial.begin(9600);
+  start = millis(); //Records the current time as "start"
+
+  pinMode(VSENSE, INPUT);
 
   cli();//stop interrupts
 
@@ -70,26 +83,46 @@ void setup(void) {
 
   sei();//allow interrupts
   //END TIMER SETUP
+
+  delay(1000); //Waits 3 seconds
+  Serial.begin(9600); //initialises serial port at 9600 baud rate
 }
 
+// #########################################################################
+// Main Loop
+// #########################################################################
 
 void loop() {
   if (millis() - runTime >= 0L) { // Execute every 2s
     runTime = millis();
-
-    // Test with a slowly changing value from a Sine function
-    //d += 4; if (d >= 360) d = 0;
-
-    // Set the the position, gap between meters, and inner radius of the meters
-    int xpos = 0, ypos = 5, gap = 4, radius = 52;
-
-
-
-    // Draw a large meter
-    xpos = 480/2 - 160, ypos = 0, gap = 15, radius = 170;
+    //Draw a large meter
+    xpos = 480 / 2 - 160, ypos = 0, gap = 15, radius = 170;
     reading = Speed;
-    // Comment out above meters, then uncomment the next line to show large meter
-    ringMeter(reading,0,100, xpos,ypos,radius,"KPH",GREEN2RED); // Draw analogue meter
+    ringMeter(reading, 0 , 60 , xpos, ypos, radius, "KPH", GREEN2RED); // Draw analogue meter
+    Serial.println (Voltage);
+    frames ++;
+    tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+    tft.drawFloat(lastfps, 2, 0 , 20 , 4); // Text, xpos, ypos,
+    tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
+    tft.drawFloat(fps, 2, 0 , 20 , 4); // Text, xpos, ypos,
+    lastfps = fps;
+    if (cyclecount == 5)
+    {
+      //Voltage = (analogRead((VSENSE)*Vk*60)/1024);
+      Voltage = analogRead(VSENSE);
+      Voltage = (Voltage * Vk * 60) / 1024;
+      cyclecount = 0;
+      //Serial.println ("here");
+      tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+      tft.drawFloat(LastVoltage, 1, 0 , 300 , 4); // Text, xpos, ypos,
+      tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
+      tft.drawFloat(Voltage, 1, 0 , 300 , 4); // Text, xpos, ypos,
+      LastVoltage = Voltage;
+    }
+    else
+    {
+      cyclecount ++;
+    }
 
   }
 }
@@ -100,16 +133,18 @@ void speedCalc()
   if (now - start > debounce)
   {
     Rotations++ ;
-    Serial.println (Rotations);
+    //Serial.println (Rotations);
     start = now;
   }
 }
 
-ISR(TIMER1_COMPA_vect) 
+ISR(TIMER1_COMPA_vect)
 {
   Speed = Rotations;
-  Serial.println (Speed);
+  //Serial.println (Speed);
   Rotations = 0;
+  fps = frames;
+  frames = 0;
 }
 
 
@@ -121,11 +156,11 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
 {
   // Minimum value of r is about 52 before value text intrudes on ring
   // drawing the text first is an option
-  
+
   x += r; y += r;   // Calculate coords of centre of ring
 
   int w = r / 3;    // Width of outer ring is 1/4 of radius
-  
+
   int angle = 150;  // Half the sweep angle of meter (300 degrees)
 
   int v = map(value, vmin, vmax, -angle, angle); // Map the value to an angle v
@@ -135,9 +170,9 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
 
   // Variable to save "value" text colour from scheme and set default
   int colour = HX8357_BLUE;
- 
+
   // Draw colour blocks every inc degrees
-  for (int i = -angle+inc/2; i < angle-inc/2; i += inc) {
+  for (int i = -angle + inc / 2; i < angle - inc / 2; i += inc) {
     // Calculate pair of coordinates for segment start
     float sx = cos((i - 90) * 0.0174532925);
     float sy = sin((i - 90) * 0.0174532925);
@@ -178,15 +213,15 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
   char buf[10];
   byte len = 3; if (value > 999) len = 5;
   dtostrf(value, len, 0, buf);
-  buf[len] = ' '; buf[len+1] = 0; // Add blanking space and terminator, helps to centre text too!
+  buf[len] = ' '; buf[len + 1] = 0; // Add blanking space and terminator, helps to centre text too!
   // Set the text colour to default
   tft.setTextSize(1);
 
-  if (value<vmin || value>vmax) {
-    drawAlert(x,y+90,50,1);
+  if (value < vmin || value > vmax) {
+    drawAlert(x, y + 90, 50, 1);
   }
   else {
-    drawAlert(x,y+90,50,0);
+    drawAlert(x, y + 90, 50, 0);
   }
 
   tft.setTextColor(HX8357_WHITE, HX8357_BLACK);
@@ -195,7 +230,7 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
   tft.setTextDatum(MC_DATUM);
   // Print value, if the meter is large then use big font 8, othewise use 4
   if (r > 84) {
-    tft.setTextPadding(55*3); // Allow for 3 digits each 55 pixels wide
+    tft.setTextPadding(55 * 3); // Allow for 3 digits each 55 pixels wide
     tft.drawString(buf, x, y, 8); // Value in middle
   }
   else {
@@ -216,13 +251,13 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
 void drawAlert(int x, int y , int side, boolean draw)
 {
   if (draw && !alert) {
-    tft.fillTriangle(x, y, x+30, y+47, x-30, y+47, rainbow(95));
+    tft.fillTriangle(x, y, x + 30, y + 47, x - 30, y + 47, rainbow(95));
     tft.setTextColor(HX8357_BLACK);
     tft.drawCentreString("!", x, y + 6, 4);
     alert = 1;
   }
   else if (!draw) {
-    tft.fillTriangle(x, y, x+30, y+47, x-30, y+47, HX8357_BLACK);
+    tft.fillTriangle(x, y, x + 30, y + 47, x - 30, y + 47, HX8357_BLACK);
     alert = 0;
   }
 }
