@@ -3,6 +3,7 @@
   colour screen
   Needs Fonts 2, 4 and 7 (also Font 6 if using a large size meter)
 */
+//https://github.com/Bodmer/TFT_HX8357/blob/master/TFT_HX8357.cpp
 
 // #########################################################################
 // Pin Naming
@@ -42,26 +43,57 @@ int lastfps;
 // #########################################################################
 #define FALLING 2 //define falling edge state as "FALLING"
 unsigned long start, finished, now; // Variables for time
+
+// #########################################################################
+// Variables
+// #########################################################################
 const int debounce = 10;  // debounce in milliseconds
 byte Rotations = 0; //Variable for # of rotations
-byte Speed = 0; // Variable to hold speed
+float Speed = 0; // Variable to hold speed
+float LastSpeed; //Variable to hold previous value to clear screen
+float MaxSpeed = 0; //Variable for max speed
+float LastMaxSpeed; //variable to hold previous value to clear screen
+
 float Voltage ; //Variable to hold voltage
 float LastVoltage = 0 ; //variable to hold previous value to clear screen
 float Vk = .98; //adjustment for voltage calculation
+float Vmin = 100; //Variable that the voltage will be smaller than
+float LastVmin; //variable to hold previous value to clear screen
+
 float Current; //variable to hold current
 float LastCurrent; //variable to hold previous value to clear screen
 float ZeroCurrent = 929; //Current reading when current is 0.
 float Ck = 1; //Adjustment for current calculation
+float Amax = 0; //Variable for max current
+float LastAmax; //variable to hold previous value to clear screen
+int CurrentReading; //variable to hold raw analog input value
+int LastCurrentReading;//variable to hold previous value to clear screen
+
+int Power; //Variable to hold speed
+int LastPower; //variable to hold previous value to clear screen
+int Pmax = 0; //variable to hold max power
+int LastPmax; //variable to hold previous value to clear screen
+
+int StartupCycleCount = 5;
 // #########################################################################
 // Setup
 // #########################################################################
 
 void setup(void) {
+
   //setup LCD
   tft.begin();
   //Serial.begin(9600);
   tft.setRotation(1);
   tft.fillScreen(HX8357_BLACK);
+  tft.drawString("Current", 382, 40, 4);
+  tft.drawString("Amax", 400, 160, 4);
+  tft.drawString("Voltage", 10, 40, 4);
+  tft.drawString("Vmin", 10, 160, 4);
+  tft.drawCentreString("Speed", 242, 5, 4);
+  tft.drawString("MaxSpeed", 345, 260, 4);
+  tft.drawCentreString("Power", 242, 140, 4);
+  tft.drawString("Pmax", 10, 260, 4);
 
   //setup hardware interrupt
   pinMode(HALL, INPUT_PULLUP); //set the speedometer switch pin (D18) as an input with an internal pull up to 5V.
@@ -89,57 +121,139 @@ void setup(void) {
   sei();//allow interrupts
   //END TIMER SETUP
 
-  delay(1000); //Waits 3 seconds
+
   Serial.begin(9600); //initialises serial port at 9600 baud rate
+  delay(500); //Waits 3 seconds
 }
 
 // #########################################################################
 // Main Loop
 // #########################################################################
 
-void loop() {
-  if (millis() - runTime >= 0L) { // Execute every 2s
-    runTime = millis();
-    //Draw a large meter
-    xpos = 480 / 2 - 160, ypos = 0, gap = 15, radius = 170;
-    reading = Speed;
-    ringMeter(reading, 0 , 60 , xpos, ypos, radius, "KPH", GREEN2RED); // Draw analogue meter
-    //Serial.println (Voltage);
-    frames ++;
-    tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
-    tft.drawFloat(lastfps, 2, 0 , 20 , 4); // Text, xpos, ypos,
-    tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
-    tft.drawFloat(fps, 2, 0 , 20 , 4); // Text, xpos, ypos,
-    lastfps = fps;
-    if (cyclecount == 1)
-    {
-      //Voltage = (analogRead((VSENSE)*Vk*60)/1024);
-      Voltage = analogRead(VSENSE);
-      Voltage = (Voltage * Vk * 60) / 1024;
-      cyclecount = 0;
-      //Serial.println ("here");
-      tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
-      tft.drawFloat(LastVoltage, 5, 0 , 300 , 4); // Text, xpos, ypos,
-      tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
-      tft.drawFloat(Voltage, 1, 0 , 300 , 4); // Text, xpos, ypos,
-      LastVoltage = Voltage;
-      Current = analogRead(CSENSE);
-      Serial.println(Current);
-      Current = (ZeroCurrent-Current)*(5/(137216*0.0003))*Ck;
-      tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
-      tft.drawFloat(LastCurrent, 1, 0 , 150 , 4); // Text, xpos, ypos,
-      tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
-      tft.drawFloat(Current, 1, 0 , 150 , 4); // Text, xpos, ypos,
-      LastCurrent = Current;
+void loop() 
+{
+  if (millis() - runTime >= 0L) 
+    { // Execute every 2s
+      runTime = millis();
+      //Draw a large meter
+      //xpos = 480 / 2 - 160, ypos = 0, gap = 15, radius = 170;
+      //reading = Speed;
+      //ringMeter(reading, 0 , 60 , xpos, ypos, radius, "KPH", GREEN2RED); // Draw analogue meter
+      //Serial.println (Voltage);
+      //    frames ++;
+      //    tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+      //    tft.drawFloat(lastfps, 0, 5 , 20 , 4); // Text, xpos, ypos,
+      //    delay (10);
+      //    tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
+      //    tft.drawFloat(fps, 0, 5 , 20 , 4); // Text, xpos, ypos,
+      //    lastfps = fps;
+      if (cyclecount == 1)
+        {
+          //Voltage = (analogRead((VSENSE)*Vk*60)/1024);
+          Voltage = analogRead(VSENSE);
+          Voltage = (Voltage * Vk * 60) / 1024;
+          cyclecount = 0;
+          //Serial.println ("here");
+          //Voltage = 48;
+          if (Voltage < Vmin)
+            {
+              Vmin = Voltage ;
+            }
+    
+          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(LastVoltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(LastVmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
+          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(Voltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(Vmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
+          LastVoltage = Voltage;
+          LastVmin = Vmin;
+         
+          Current = analogRead(CSENSE);
+          CurrentReading = Current;
+          //Serial.println(Current);
+          Current = (ZeroCurrent - Current) * (5 / (137216 * 0.0003)) * Ck; //Just is
+          //Current = 65;
+          if (StartupCycleCount > 1) //Check if it is still in its first few cycles   
+            {    
+              -- StartupCycleCount; //decrement the variable by one
+            }
+          
+          else if (StartupCycleCount == 0) //execute after the first few cycles
+            {   
+              if (Current > Amax)
+                {
+                  Amax = Current ;
+                }
+            }
+            
+          else 
+            {
+              StartupCycleCount = 0;
+            }
+            
+          if (Current < 0.5)
+            {
+              Current = 0 ;
+            }
+            
+          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(LastCurrent, 1, 360 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(LastAmax, 1, 417 , 190 , 4); // (float, dp, X, Y, font)
+          tft.drawNumber(LastCurrentReading, 240 , 290 , 4); // (float, dp, X, Y, font)
+          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(Current, 1, 360 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(Amax, 1, 417 , 190 , 4); // (float, dp, X, Y, font)
+          tft.drawNumber(CurrentReading, 240 , 290 , 4); // (float, dp, X, Y, font)
+          LastCurrent = Current;
+          LastAmax = Amax;
+          LastCurrentReading = CurrentReading;     
+            
+          Power = (Current * Voltage);
+          if (StartupCycleCount == 0) //execute after the first few cycles
+            {   
+              if (Power > Pmax)
+                {
+                  Pmax = Power ;
+                }
+            }
+          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawNumber(LastPower, 130 , 165 , 8); // (float, dp, X, Y, font)
+          tft.drawNumber(LastPmax, 10 , 290 , 4); // (float, dp, X, Y, font)
+          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawNumber(Power, 130 , 165 , 8); // (float, dp, X, Y, font)
+          tft.drawNumber(Pmax, 10 , 290 , 4); // (float, dp, X, Y, font)
+          LastPower = Power;
+          LastPmax = Pmax;
+    
+          //Speed = 50;
+          if (Speed <=2)
+            {
+              Speed = 0;
+            }
+          if (Speed > MaxSpeed)
+            {
+              MaxSpeed = Speed ;
+            }
+          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(LastSpeed, 1, 145 , 35 , 8); // (float, dp, X, Y, font)
+          tft.drawFloat(LastMaxSpeed, 1, 417 , 290 , 4); // (float, dp, X, Y, font)
+          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(Speed, 1, 145 , 35 , 8); // (float, dp, X, Y, font)
+          tft.drawFloat(MaxSpeed, 1, 417 , 290 , 4); // (float, dp, X, Y, font)
+          LastSpeed = Speed;
+          LastMaxSpeed = MaxSpeed;
+        }  
+      
+      else
+        {
+          cyclecount ++; //increase cyclecount by one
+        } 
       
     }
-    else
-    {
-      cyclecount ++;
-    }
-
-  }
 }
+
+
 
 void speedCalc()
 {
