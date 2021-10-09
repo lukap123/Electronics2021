@@ -62,7 +62,7 @@ float LastVmin; //variable to hold previous value to clear screen
 
 float Current; //variable to hold current
 float LastCurrent; //variable to hold previous value to clear screen
-float ZeroCurrent = 929; //Current reading when current is 0.
+float ZeroCurrent = 920; //Current reading when current is 0. 
 float Ck = 1; //Adjustment for current calculation
 float Amax = 0; //Variable for max current
 float LastAmax; //variable to hold previous value to clear screen
@@ -132,47 +132,10 @@ void setup(void) {
 
 void loop() 
 {
-  if (millis() - runTime >= 0L) 
-    { // Execute every 2s
-      runTime = millis();
-      //Draw a large meter
-      //xpos = 480 / 2 - 160, ypos = 0, gap = 15, radius = 170;
-      //reading = Speed;
-      //ringMeter(reading, 0 , 60 , xpos, ypos, radius, "KPH", GREEN2RED); // Draw analogue meter
-      //Serial.println (Voltage);
-      //    frames ++;
-      //    tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
-      //    tft.drawFloat(lastfps, 0, 5 , 20 , 4); // Text, xpos, ypos,
-      //    delay (10);
-      //    tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
-      //    tft.drawFloat(fps, 0, 5 , 20 , 4); // Text, xpos, ypos,
-      //    lastfps = fps;
-      if (cyclecount == 1)
-        {
-          //Voltage = (analogRead((VSENSE)*Vk*60)/1024);
-          Voltage = analogRead(VSENSE);
-          Voltage = (Voltage * Vk * 60) / 1024;
-          cyclecount = 0;
-          //Serial.println ("here");
-          //Voltage = 48;
-          if (Voltage < Vmin)
-            {
-              Vmin = Voltage ;
-            }
-    
-          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
-          tft.drawFloat(LastVoltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
-          tft.drawFloat(LastVmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
-          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
-          tft.drawFloat(Voltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
-          tft.drawFloat(Vmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
-          LastVoltage = Voltage;
-          LastVmin = Vmin;
-         
-          Current = analogRead(CSENSE);
+  Current = analogRead(CSENSE);
           CurrentReading = Current;
           //Serial.println(Current);
-          Current = (ZeroCurrent - Current) * (5 / (137216 * 0.0003)) * Ck; //Just is
+          Current = (ZeroCurrent - Current) * (4.88 / (137216 * 0.0003)) * Ck; //Just is
           //Current = 65;
           if (StartupCycleCount > 1) //Check if it is still in its first few cycles   
             {    
@@ -196,6 +159,45 @@ void loop()
             {
               Current = 0 ;
             }
+            
+  if (millis() - runTime >= 0L) 
+    { // Execute every 2s
+      runTime = millis();
+      //Draw a large meter
+      //xpos = 480 / 2 - 160, ypos = 0, gap = 15, radius = 170;
+      //reading = Speed;
+      //ringMeter(reading, 0 , 60 , xpos, ypos, radius, "KPH", GREEN2RED); // Draw analogue meter
+      //Serial.println (Voltage);
+      //    frames ++;
+      //    tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+      //    tft.drawFloat(lastfps, 0, 5 , 20 , 4); // Text, xpos, ypos,
+      //    delay (10);
+      //    tft.setTextColor (0xF800); //sets text colour in RGB565 format(0x, R, GG, B,)
+      //    tft.drawFloat(fps, 0, 5 , 20 , 4); // Text, xpos, ypos,
+      //    lastfps = fps;
+      if (cyclecount == 5)
+        {
+          //Voltage = (analogRead((VSENSE)*Vk*60)/1024);
+          Voltage = analogRead(VSENSE);
+          Voltage = (Voltage * Vk * 60) / 1024;
+          cyclecount = 0;
+          //Serial.println ("here");
+          //Voltage = 48;
+          if (Voltage < Vmin)
+            {
+              Vmin = Voltage ;
+            }
+    
+          tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(LastVoltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(LastVmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
+          tft.setTextColor (0xB7E0); //sets text colour in RGB565 format(0x, R, GG, B,)
+          tft.drawFloat(Voltage, 1, 10 , 80 , 7); // (float, dp, X, Y, font)
+          tft.drawFloat(Vmin, 1, 10 , 190 , 4); // (float, dp, X, Y, font)
+          LastVoltage = Voltage;
+          LastVmin = Vmin;
+         
+          
             
           tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
           tft.drawFloat(LastCurrent, 1, 360 , 80 , 7); // (float, dp, X, Y, font)
