@@ -37,12 +37,20 @@ unsigned long start, finished, now; // Variables for time
 // #########################################################################
 // Variables
 // #########################################################################
+#define WINDOW_SIZE 5
+
+int INDEX = 0;
+int VALUE = 0;
+int SUM = 0;
+int READINGS[WINDOW_SIZE];
+int AVERAGED = 0;
+
 const int debounce = 10;  // debounce in milliseconds
 byte Rotations = 0; //Variable for # of rotations
 float Speed = 0; // Variable to hold speed
-float LastSpeed; //Variable to hold previous value to clear screen
+float LastSpeed = 0; //Variable to hold previous value to clear screen
 float MaxSpeed = 0; //Variable for max speed
-float LastMaxSpeed; //variable to hold previous value to clear screen
+float LastMaxSpeed = 0; //variable to hold previous value to clear screen
 
 float Voltage ; //Variable to hold voltage
 float LastVoltage = 0 ; //variable to hold previous value to clear screen
@@ -50,21 +58,21 @@ float Vk = .98; //adjustment for voltage calculation
 float Vmin = 100; //Variable that the voltage will be smaller than
 float LastVmin; //variable to hold previous value to clear screen
 
-float Current; //variable to hold current
-float LastCurrent; //variable to hold previous value to clear screen
+float Current = 0; //variable to hold current
+float LastCurrent = 0; //variable to hold previous value to clear screen
 float ZeroCurrent = 920; //Current reading when current is 0. 
 float Ck = 1; //Adjustment for current calculation
 float Amax = 0; //Variable for max current
-float LastAmax; //variable to hold previous value to clear screen
-int CurrentReading; //variable to hold raw analog input value
-int LastCurrentReading;//variable to hold previous value to clear screen
+float LastAmax = 0; //variable to hold previous value to clear screen
+int CurrentReading = 0; //variable to hold raw analog input value
+int LastCurrentReading = 0 ;//variable to hold previous value to clear screen
 
-int Power; //Variable to hold speed
-int LastPower; //variable to hold previous value to clear screen
+int Power = 0; //Variable to hold speed
+int LastPower = 0; //variable to hold previous value to clear screen
 int Pmax = 0; //variable to hold max power
-int LastPmax; //variable to hold previous value to clear screen
+int LastPmax = 0; //variable to hold previous value to clear screen
 
-int StartupCycleCount = 50;
+int StartupCycleCount = 500;
 // #########################################################################
 // Setup
 // #########################################################################
@@ -113,7 +121,7 @@ void setup(void) {
 
 
   Serial.begin(9600); //initialises serial port at 9600 baud rate
-  delay(500); //Waits 3 seconds
+  delay(500); //Waits 0.5 seconds
 }
 
 // #########################################################################
@@ -127,6 +135,14 @@ void loop()
           //Serial.println(Current);
           Current = (ZeroCurrent - Current) * (4.88 / (137216 * 0.0003)) * Ck; //Just is
           //Current = 65;
+          
+          if (Current < 0.5)
+            {
+              Current = 0 ;
+            }
+
+          Power = (Current*Voltage);
+          
           if (StartupCycleCount > 1) //Check if it is still in its first few cycles   
             {    
               -- StartupCycleCount; //decrement the variable by one
@@ -138,6 +154,11 @@ void loop()
                 {
                   Amax = Current ;
                 }
+                
+              if (Power > Pmax)
+                {
+                  Pmax = Power ;
+                }
             }
             
           else 
@@ -145,10 +166,7 @@ void loop()
               StartupCycleCount = 0;
             }
             
-          if (Current < 0.5)
-            {
-              Current = 0 ;
-            }
+
             
   //if (millis() - runTime >= 0L) 
     { // Execute every 2s
@@ -187,7 +205,15 @@ void loop()
           LastVoltage = Voltage;
           LastVmin = Vmin;
          
-          
+          SUM = SUM - READINGS[INDEX];       // Remove the oldest entry from the sum
+          VALUE = Current;        // Read the next sensor value
+          READINGS[INDEX] = VALUE;           // Add the newest reading to the window
+          SUM = SUM + VALUE;                 // Add the newest reading to the sum
+          INDEX = (INDEX+1) % WINDOW_SIZE;   // Increment the index, and wrap to 0 if it exceeds the window size
+
+          AVERAGED = SUM / WINDOW_SIZE;      // Divide the sum of the window by the window size for the result
+
+          Current = AVERAGED;
             
           tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
           tft.drawFloat(LastCurrent, 1, 360 , 80 , 7); // (float, dp, X, Y, font)
@@ -201,14 +227,7 @@ void loop()
           LastAmax = Amax;
           LastCurrentReading = CurrentReading;     
             
-          Power = (Current * Voltage);
-          if (StartupCycleCount == 0) //execute after the first few cycles
-            {   
-              if (Power > Pmax)
-                {
-                  Pmax = Power ;
-                }
-            }
+          
           tft.setTextColor (TFT_BLACK); //sets text colour in RGB565 format(0x, R, GG, B,)
           tft.drawNumber(LastPower, 130 , 165 , 8); // (float, dp, X, Y, font)
           tft.drawNumber(LastPmax, 10 , 290 , 4); // (float, dp, X, Y, font)
@@ -218,12 +237,7 @@ void loop()
           LastPower = Power;
           LastPmax = Pmax;
     
-          //Speed = 50;
-          
-          //if (Speed <=2)
-            //{
-             // Speed = 0;
-            //}
+
           if (Speed > MaxSpeed)
             {
               MaxSpeed = Speed ;
