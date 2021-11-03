@@ -54,7 +54,7 @@ float LastMaxSpeed = 0; //variable to hold previous value to clear screen
 
 float Voltage ; //Variable to hold voltage
 float LastVoltage = 0 ; //variable to hold previous value to clear screen
-float Vk = .98; //adjustment for voltage calculation
+float Vk = .99; //adjustment for voltage calculation
 float Vmin = 100; //Variable that the voltage will be smaller than
 float LastVmin; //variable to hold previous value to clear screen
 
@@ -191,7 +191,7 @@ void loop()
           cyclecount = 0;
           //Serial.println ("here");
           //Voltage = 48;
-          if (Voltage < Vmin)
+          if ( (Voltage < Vmin) && (Voltage > 35) )
             {
               Vmin = Voltage ;
             }
@@ -276,7 +276,7 @@ void speedCalc()
 
 ISR(TIMER1_COMPA_vect)
 {
-  Speed = Rotations;
+  Speed = Rotations*0.88*3.6;
   //Serial.println (Speed);
   //Speed = (0.88*7.2*Speed);
   Rotations = 0;
